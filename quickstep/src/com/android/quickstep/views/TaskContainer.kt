@@ -111,30 +111,37 @@ class TaskContainer(
     val itemInfo: TaskViewItemInfo
         get() = TaskViewItemInfo(taskView, this)
 
-    fun bind() = {
-            digitalWellBeingToast?.bind(task, taskView, snapshotView, stagePosition)
-            if (!enableRefactorTaskThumbnail()) {
-                thumbnailViewDeprecated.bind(task, overlay, taskView)
-            }
+    // LC-Note: these four functions were previously declared as `fun bind() = { ... }` (an
+    // expression body assigning a lambda literal), which in Kotlin makes the function *return*
+    // an unexecuted `() -> Unit` closure rather than running the block. Every call site
+    // (`container.bind()`, `.destroy()`, etc.) compiled fine and silently no-op'd: the closure
+    // was constructed and immediately discarded, so digitalWellBeingToast binding/destruction,
+    // thumbnail recycling, and overlay refresh never actually ran. Converted to normal block
+    // bodies (`fun bind() { ... }`) so the logic executes on call.
+    fun bind() {
+        digitalWellBeingToast?.bind(task, taskView, snapshotView, stagePosition)
+        if (!enableRefactorTaskThumbnail()) {
+            thumbnailViewDeprecated.bind(task, overlay, taskView)
+        }
+    }
+
+    fun destroy() {
+        digitalWellBeingToast?.destroy()
+        taskContentView.scaleX = 1f
+        taskContentView.scaleY = 1f
+        overlay.reset()
+        if (enableRefactorTaskThumbnail()) {
+            isThumbnailValid = false
+            thumbnailData = null
+            thumbnailView.onRecycle()
+        } else {
+            thumbnailViewDeprecated.setShowSplashForSplitSelection(false)
         }
 
-    fun destroy() = {
-            digitalWellBeingToast?.destroy()
-            taskContentView.scaleX = 1f
-            taskContentView.scaleY = 1f
-            overlay.reset()
-            if (enableRefactorTaskThumbnail()) {
-                isThumbnailValid = false
-                thumbnailData = null
-                thumbnailView.onRecycle()
-            } else {
-                thumbnailViewDeprecated.setShowSplashForSplitSelection(false)
-            }
-
-            if (enableOverviewIconMenu() && taskView.type != TaskViewType.DESKTOP) {
-                (iconView as IconAppChipView).reset()
-            }
+        if (enableOverviewIconMenu() && taskView.type != TaskViewType.DESKTOP) {
+            (iconView as IconAppChipView).reset()
         }
+    }
 
     fun setOverlayEnabled(enabled: Boolean) {
         if (!enableRefactorTaskThumbnail()) {
@@ -152,19 +159,19 @@ class TaskContainer(
         }
     }
 
-    fun refreshOverlay(thumbnailPosition: ThumbnailPosition) = {
-            this.thumbnailPosition = thumbnailPosition
-            if (overlayEnabledStatus) {
-                overlay.initOverlay(
-                    task,
-                    thumbnailData?.thumbnail,
-                    thumbnailPosition.matrix,
-                    thumbnailPosition.isRotated,
-                )
-            } else {
-                overlay.reset()
-            }
+    fun refreshOverlay(thumbnailPosition: ThumbnailPosition) {
+        this.thumbnailPosition = thumbnailPosition
+        if (overlayEnabledStatus) {
+            overlay.initOverlay(
+                task,
+                thumbnailData?.thumbnail,
+                thumbnailPosition.matrix,
+                thumbnailPosition.isRotated,
+            )
+        } else {
+            overlay.reset()
         }
+    }
 
     fun addChildForAccessibility(outChildren: ArrayList<View>) {
         addAccessibleChildToList(iconView.asView(), outChildren)
@@ -182,23 +189,23 @@ class TaskContainer(
         hasHeader: Boolean,
         canShowAppTimer: Boolean,
         clickCloseListener: OnClickListener?,
-    ) = {
-            if (enableRefactorTaskContentView()) {
-                (taskContentView as TaskContentView).setState(
-                    TaskUiStateMapper.toTaskHeaderState(state, hasHeader, clickCloseListener),
-                    TaskUiStateMapper.toTaskThumbnailUiState(state),
-                    TaskUiStateMapper.toTaskAppTimerUiState(canShowAppTimer, stagePosition, state),
-                    state?.taskId,
-                )
-            } else {
-                thumbnailView.setState(
-                    TaskUiStateMapper.toTaskThumbnailUiState(state),
-                    state?.taskId,
-                )
-            }
-            thumbnailData = if (state is TaskData.Data) state.thumbnailData else null
-            overlay.setThumbnailState(thumbnailData)
+    ) {
+        if (enableRefactorTaskContentView()) {
+            (taskContentView as TaskContentView).setState(
+                TaskUiStateMapper.toTaskHeaderState(state, hasHeader, clickCloseListener),
+                TaskUiStateMapper.toTaskThumbnailUiState(state),
+                TaskUiStateMapper.toTaskAppTimerUiState(canShowAppTimer, stagePosition, state),
+                state?.taskId,
+            )
+        } else {
+            thumbnailView.setState(
+                TaskUiStateMapper.toTaskThumbnailUiState(state),
+                state?.taskId,
+            )
         }
+        thumbnailData = if (state is TaskData.Data) state.thumbnailData else null
+        overlay.setThumbnailState(thumbnailData)
+    }
 
     fun updateTintAmount(tintAmount: Float) {
         thumbnailView.updateTintAmount(tintAmount)
