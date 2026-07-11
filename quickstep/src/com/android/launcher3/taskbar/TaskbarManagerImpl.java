@@ -72,6 +72,8 @@ import android.window.DesktopExperienceFlags;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
+import androidx.lifecycle.ViewTreeLifecycleOwner;
+import androidx.savedstate.ViewTreeSavedStateRegistryOwner;
 
 import com.android.app.displaylib.DisplayDecorationListener;
 import com.android.app.displaylib.DisplaysWithDecorationsRepositoryCompat;
@@ -1253,6 +1255,13 @@ public class TaskbarManagerImpl implements DisplayDecorationListener {
             FrameLayout rootLayout = getTaskbarRootLayoutForDisplay(displayId);
             WindowManager windowManager = getWindowManager(displayId);
             if (rootLayout != null && windowManager != null) {
+                // LC-Note: Compose views hosted in the taskbar (e.g. preference-driven UI)
+                // require a ViewTreeLifecycleOwner/ViewTreeSavedStateRegistryOwner on an
+                // ancestor before the tree is attached to the window, or they throw
+                // IllegalStateException on first composition. Neither owner is set anywhere
+                // else in the taskbar root layout's ancestry, so set both here before addView.
+                ViewTreeLifecycleOwner.set(rootLayout, taskbar);
+                ViewTreeSavedStateRegistryOwner.set(rootLayout, taskbar);
                 windowManager.addView(rootLayout, taskbar.getWindowLayoutParams());
                 mAddedRootLayouts.put(displayId, true);
             } else {
