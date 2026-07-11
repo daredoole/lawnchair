@@ -200,12 +200,15 @@ public abstract class RemoteAnimationRunnerCompat extends IRemoteAnimationRunner
                     // Don't release here since launcher might still be using them. Instead
                     // let launcher release them (eg. via RemoteAnimationTargets)
                     leashMap.clear();
-                    try {
-                        finishCallback.onTransitionFinished(null /* wct */, finishTransaction);
-                        finishTransaction.close();
-                    } catch (RemoteException e) {
-                        Log.e(TAG, "Failed to call app controlled animation finished callback", e);
-                    }
+                    // LC-Note: IRemoteTransitionFinishedCallback#onTransitionFinished's overload
+                    // set differs across Android 16 builds in the field; a direct two/three-arg
+                    // call throws on builds that don't have that exact overload, breaking this
+                    // remote-animation-runner finish path. Route through
+                    // RemoteTransitionFinishCompat, which tries each known overload via
+                    // reflection.
+                    RemoteTransitionFinishCompat.finish(
+                            finishCallback, null /* wct */, finishTransaction);
+                    finishTransaction.close();
                 };
                 synchronized (mFinishRunnables) {
                     mFinishRunnables.put(token, animationFinishedCallback);

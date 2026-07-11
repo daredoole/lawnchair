@@ -20,7 +20,6 @@ import android.animation.ValueAnimator
 import android.app.WindowConfiguration.ACTIVITY_TYPE_HOME
 import android.graphics.Rect
 import android.os.IBinder
-import android.os.RemoteException
 import android.view.SurfaceControl
 import android.view.SurfaceControl.Transaction
 import android.window.IRemoteTransitionFinishedCallback
@@ -28,6 +27,7 @@ import android.window.RemoteTransitionStub
 import android.window.TransitionInfo
 import com.android.launcher3.anim.AnimatorListeners.forEndCallback
 import com.android.launcher3.util.Executors
+import com.android.systemui.animation.RemoteTransitionFinishCompat
 import com.android.wm.shell.shared.TransitionUtil
 
 /** Remote animation which slides the opening targets in and the closing targets out */
@@ -95,11 +95,13 @@ class SlideInRemoteTransition(
             forEndCallback(
                 Runnable {
                     val t = Transaction()
-                    try {
-                        finishCB.onTransitionFinished(null, t)
-                    } catch (e: RemoteException) {
-                        // Ignore
-                    }
+                    // LC-Note: IRemoteTransitionFinishedCallback#onTransitionFinished's overload
+                    // set differs across Android 16 builds in the field; a direct two/three-arg
+                    // call throws on builds that don't have that exact overload, breaking this
+                    // slide-in transition and leaving stale surfaces on screen. Route through
+                    // RemoteTransitionFinishCompat, which tries each known overload via
+                    // reflection.
+                    RemoteTransitionFinishCompat.finish(finishCB, null, t)
                 }
             )
         )

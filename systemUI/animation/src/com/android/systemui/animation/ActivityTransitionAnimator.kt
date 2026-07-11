@@ -948,7 +948,17 @@ constructor(
                     override fun onAnimationFinished() {
                         leashMap.clear()
                         val finishTransaction = SurfaceControl.Transaction()
-                        finishCallback?.onTransitionFinished(null, finishTransaction)
+                        // LC-Note: IRemoteTransitionFinishedCallback#onTransitionFinished's
+                        // overload set differs across Android 16 builds in the field; a direct
+                        // two/three-arg call throws on builds that don't have that exact
+                        // overload, breaking this activity-launch transition. Route through
+                        // RemoteTransitionFinishCompat, which tries each known overload via
+                        // reflection.
+                        RemoteTransitionFinishCompat.finish(
+                            finishCallback,
+                            null,
+                            finishTransaction,
+                        )
                         finishTransaction.close()
                     }
                 }
