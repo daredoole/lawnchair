@@ -20,6 +20,8 @@ import android.util.Log
 import android.window.DesktopExperienceFlags
 import android.window.DesktopModeFlags
 import androidx.annotation.VisibleForTesting
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import com.android.launcher3.BubbleTextView.RunningAppState
 import com.android.launcher3.Flags
 import com.android.launcher3.Flags.enableRecentsInTaskbar
@@ -71,8 +73,13 @@ class TaskbarRecentAppsController(
             false
         }
 
-    // TODO(b/343532825): Add a setting to disable Recents even when the flag is on.
-    var canShowRecentApps = enableRecentsInTaskbar()
+    // LC-Note: TODO(b/343532825) asked for a setting to disable Recents even when the flag is on
+    // -- added below via PreferenceManager2. Both this and the max-count are read once at
+    // construction; taskbar-recreation (triggered by the preferences' onSet) is what applies a
+    // change, matching how every other taskbar-affecting preference in this codebase works.
+    var canShowRecentApps =
+        enableRecentsInTaskbar() &&
+            PreferenceManager2.getInstance(context).enableTaskbarRecents.firstCached()
         @VisibleForTesting
         set(isEnabledFromTest) {
             field = isEnabledFromTest
@@ -80,6 +87,10 @@ class TaskbarRecentAppsController(
                 recentsModel.unregisterRecentTasksChangedListener(recentTasksChangedListener)
             }
         }
+
+    private val maxRecentTasks =
+        PreferenceManager2.getInstance(context).taskbarRecentsMaxCount.firstCached()
+            .coerceIn(1, 6)
 
     // Initialized in init.
     private lateinit var controllers: TaskbarControllers
@@ -432,9 +443,9 @@ class TaskbarRecentAppsController(
         // Remove the current task.
         val allRecentTasks = allRecentTasks.subList(0, allRecentTasks.size - 1)
         var shownTasks = dedupeHotseatTasks(allRecentTasks, shownHotseatItems)
-        if (shownTasks.size > MAX_RECENT_TASKS) {
-            // Remove any tasks older than MAX_RECENT_TASKS.
-            shownTasks = shownTasks.subList(shownTasks.size - MAX_RECENT_TASKS, shownTasks.size)
+        if (shownTasks.size > maxRecentTasks) {
+            // Remove any tasks older than maxRecentTasks.
+            shownTasks = shownTasks.subList(shownTasks.size - maxRecentTasks, shownTasks.size)
         }
         return shownTasks
     }
@@ -509,7 +520,5 @@ class TaskbarRecentAppsController(
 
     private companion object {
         private val TAG = "TaskbarRecentAppsController"
-
-        const val MAX_RECENT_TASKS = 2
     }
 }
