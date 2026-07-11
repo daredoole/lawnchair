@@ -148,8 +148,13 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
         ItemInfo itemInfo = null;
         if (icon.getTag() instanceof ItemInfo item && ShortcutUtil.supportsShortcuts(item)) {
             itemInfo = item;
-        } else if (PinToTaskbarShortcut.Companion.isPinningAppWithContextMenuEnabled(mContext)
-                && icon.getTag() instanceof SingleTask task) {
+        } else if (icon.getTag() instanceof SingleTask task) {
+            // LC-Note: this used to also require isPinningAppWithContextMenuEnabled(), which is
+            // permanently false on devices without desktop-windowing platform support. That
+            // conflated "does this recent-task icon get a popup menu at all" with the unrelated
+            // "pin from context menu" desktop-mode feature, silently disabling long-press on
+            // every recents-in-taskbar icon (App info/Split screen/etc never resolved). The pin
+            // shortcut itself stays correctly gated below via createPinShortcut's caller.
             Task.TaskKey key = task.getTask().getKey();
             AppInfo appInfo = getApp(
                     new ComponentKey(key.getComponent(), UserHandle.of(key.userId)));

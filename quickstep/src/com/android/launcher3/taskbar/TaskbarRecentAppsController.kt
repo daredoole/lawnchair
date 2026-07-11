@@ -443,6 +443,12 @@ class TaskbarRecentAppsController(
         // Remove the current task.
         val allRecentTasks = allRecentTasks.subList(0, allRecentTasks.size - 1)
         var shownTasks = dedupeHotseatTasks(allRecentTasks, shownHotseatItems)
+        // LC-Note: dedupeHotseatTasks only strips recents that duplicate a *pinned* app; it never
+        // catches repeat task entries for the same package within the recents list itself (e.g.
+        // Android genuinely keeping multiple task IDs for one app). A taskbar recents strip
+        // should read as "your last N distinct apps", not "your last N task instances", so
+        // collapse same-package repeats here, keeping the most recent occurrence of each.
+        shownTasks = dedupeByPackage(shownTasks)
         if (shownTasks.size > maxRecentTasks) {
             // Remove any tasks older than maxRecentTasks.
             shownTasks = shownTasks.subList(shownTasks.size - maxRecentTasks, shownTasks.size)
@@ -478,6 +484,18 @@ class TaskbarRecentAppsController(
                 }
             }
         }
+    }
+
+    /**
+     * Collapses same-package [SingleTask] entries down to their single most recent occurrence,
+     * preserving list order. Non-[SingleTask] entries (app pairs, desktop groups) pass through
+     * untouched.
+     */
+    private fun dedupeByPackage(groupTasks: List<GroupTask>): List<GroupTask> {
+        val seenPackages = mutableSetOf<String>()
+        return groupTasks.asReversed()
+            .filter { task -> task !is SingleTask || seenPackages.add(task.packageNames.first()) }
+            .asReversed()
     }
 
     /**
