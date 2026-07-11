@@ -18,6 +18,7 @@ package com.android.quickstep
 import android.app.ActivityManager
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.ActivityOptions
+import android.app.ActivityTaskManager
 import android.app.ActivityTaskManager.INVALID_TASK_ID
 import android.app.PendingIntent
 import android.content.ComponentName
@@ -1092,8 +1093,28 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
         } catch (e: RemoteException) {
             Log.e(TAG, "Failed call getRecentTasks", e)
             throw GetRecentTasksException("Failed call getRecentTasks", e)
+        } catch (e: RuntimeException) {
+            // LC-Note: some Android 16 builds' Shell IRecentTasks implementation throws a
+            // RuntimeException here instead of the expected RemoteException (an ABI mismatch
+            // manifests as a runtime failure inside the binder call, not a clean
+            // RemoteException). Fall back to the platform ActivityTaskManager API rather than
+            // losing Recents/taskbar-recents entirely.
+            Log.e(TAG, "Failed to read Shell grouped recent tasks; falling back to ATM", e)
+            return getRecentTasksFallback(numTasks, userId)
         } finally {
             traceEnd(Trace.TRACE_TAG_APP)
+        }
+    }
+
+    private fun getRecentTasksFallback(numTasks: Int, userId: Int): ArrayList<GroupedTaskInfo> {
+        try {
+            val rawTasks =
+                ActivityTaskManager.getInstance()
+                    .getRecentTasks(numTasks, ActivityManager.RECENT_IGNORE_UNAVAILABLE, userId)
+            return ArrayList(rawTasks.map { GroupedTaskInfo.forFullscreenTasks(it) })
+        } catch (fallbackError: RuntimeException) {
+            Log.e(TAG, "Failed fallback call getRecentTasks", fallbackError)
+            throw GetRecentTasksException("Failed fallback call getRecentTasks", fallbackError)
         }
     }
 
