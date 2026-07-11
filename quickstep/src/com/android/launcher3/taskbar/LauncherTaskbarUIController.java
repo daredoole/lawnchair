@@ -513,11 +513,16 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         return mTaskbarLauncherStateController.isInOverviewUi();
     }
 
+    // LC-Note: without the isInApp() check, toggling All Apps from the taskbar while the
+    // taskbar is stashed in-app (i.e. showing over another app, not over the home screen)
+    // could route to the home screen's All Apps toggle even though Launcher itself isn't
+    // resumed to the foreground -- opening/closing the wrong All Apps surface.
     @Override
     protected void toggleAllApps(boolean focusSearch) {
         boolean canToggleHomeAllApps = mLauncher.isResumed()
                 && !mTaskbarLauncherStateController.isInOverviewUi()
-                && !mLauncher.areDesktopTasksVisible();
+                && !mLauncher.areDesktopTasksVisible()
+                && !mControllers.taskbarStashController.isInApp();
         if (canToggleHomeAllApps) {
             mLauncher.toggleAllApps(focusSearch);
             return;

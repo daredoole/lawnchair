@@ -20,7 +20,10 @@ import android.util.AttributeSet;
 
 import androidx.annotation.Nullable;
 
+import app.lawnchair.search.LawnchairSearchUiDelegate;
+
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
+import com.android.launcher3.allapps.search.AllAppsSearchUiDelegate;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
 
 import java.util.Optional;
@@ -37,6 +40,16 @@ public class TaskbarAllAppsContainerView extends
 
     public TaskbarAllAppsContainerView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+    }
+
+    // LC-Note: without this override, taskbar All Apps falls back to the AOSP default
+    // AllAppsSearchUiDelegate instead of Lawnchair's own search implementation -- the same
+    // override app.lawnchair.allapps.views.SearchContainerView already applies for the
+    // home-screen all-apps drawer. Taskbar All Apps search was effectively non-functional
+    // (no results from Lawnchair's search providers) without it.
+    @Override
+    protected AllAppsSearchUiDelegate createSearchUiDelegate() {
+        return new LawnchairSearchUiDelegate(this);
     }
 
     void setOnInvalidateHeaderListener(OnInvalidateHeaderListener onInvalidateHeaderListener) {
