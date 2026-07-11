@@ -58,6 +58,15 @@ public class QuickstepProcessInitializer extends MainProcessInitializer {
 
         super.init(context);
 
+        // LC-Note: without this call, QuickstepProtoLogGroup.isProtoLogInitialized() (checked
+        // by every ActiveGestureProtoLogProxy/OverviewCommandHelperProtoLogProxy/etc. call site
+        // before logging) never returns true, so gesture-pipeline ProtoLog logging is silently
+        // dropped for the process lifetime -- harmless for functionality, but loses the ability
+        // to diagnose gesture/Overview issues via ProtoLog dumps.
+        if (Utilities.ATLEAST_R) {
+            QuickstepProtoLogGroup.initProtoLog();
+        }
+
         // Elevate GPU priority for Quickstep and Remote animations.
         // LC: https://github.com/LawnchairLauncher/lawnchair/pull/4331
         try {

@@ -18,6 +18,7 @@ package com.android.quickstep;
 
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
+import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 
 import static com.android.launcher3.util.OverviewReleaseFlags.enableGridOnlyOverview;
 import static com.android.launcher3.Flags.enableRefactorTaskThumbnail;
@@ -26,6 +27,7 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 
 import android.app.ActivityOptions;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Rect;
@@ -215,6 +217,20 @@ public interface TaskShortcutFactory {
             final Task.TaskKey taskKey = mTaskContainer.getTask().key;
             final int taskId = taskKey.id;
             options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+            // LC-Note: on some Android 16 builds, ActivityManagerWrapper#startActivityFromRecents
+            // silently fails (or throws) for the Freeform shortcut specifically, leaving "Open in
+            // freeform window" a dead menu item. Try starting the task's base intent directly
+            // first; only fall back to the recents-transition path (with its snapshot/animation
+            // handling below) if that throws. NOTE: this changes which path runs in the common
+            // case -- the animated snapshot transition below is now skipped whenever the direct
+            // start succeeds, not just used as a last resort. Flagging for extra review since
+            // it's a bigger behavioral change than the other fixes in this branch, not just a
+            // defensive guard.
+            if (startBaseIntentInFreeform(taskKey, options)) {
+                mTarget.getStatsLogManager().logger().withItemInfo(mTaskContainer.getItemInfo())
+                            .log(mLauncherEvent);
+                return;
+            }
             if (ActivityManagerWrapper.getInstance().startActivityFromRecents(taskId,
                     options)) {
                 final Runnable animStartedListener = () -> {
@@ -259,6 +275,18 @@ public interface TaskShortcutFactory {
                         taskKey.displayId);
                 mTarget.getStatsLogManager().logger().withItemInfo(mTaskContainer.getItemInfo())
                             .log(mLauncherEvent);
+            }
+        }
+
+        private boolean startBaseIntentInFreeform(Task.TaskKey taskKey, ActivityOptions options) {
+            try {
+                Intent intent = new Intent(taskKey.baseIntent);
+                intent.addFlags(FLAG_ACTIVITY_NEW_TASK);
+                mTarget.asContext().startActivity(intent, options.toBundle());
+                return true;
+            } catch (RuntimeException e) {
+                Log.w(TAG, "Failed to start base intent in freeform; falling back to recents", e);
+                return false;
             }
         }
 
