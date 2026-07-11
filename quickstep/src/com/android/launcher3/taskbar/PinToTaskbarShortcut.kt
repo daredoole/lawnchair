@@ -104,8 +104,18 @@ class PinToTaskbarShortcut<T>(
     }
 
     companion object {
-        fun isPinningAppWithContextMenuEnabled(context: TaskbarActivityContext): Boolean =
-            DesktopExperienceFlags.ENABLE_PINNING_APP_WITH_CONTEXT_MENU.isTrue &&
-                context.isTaskbarShowingDesktopTasks
+        // LC-Note: ENABLE_PINNING_APP_WITH_CONTEXT_MENU is absent from some devices' framework.jar
+        // (platform flag set drift vs. the AOSP source it was compiled against) and throws
+        // NoSuchFieldError on first access. Treat a missing flag as "not enabled" instead of
+        // crashing, same pattern as TaskbarActivityContext#shouldLaunchInDesktop.
+        fun isPinningAppWithContextMenuEnabled(context: TaskbarActivityContext): Boolean {
+            val flagEnabled =
+                try {
+                    DesktopExperienceFlags.ENABLE_PINNING_APP_WITH_CONTEXT_MENU.isTrue
+                } catch (_: NoSuchFieldError) {
+                    false
+                }
+            return flagEnabled && context.isTaskbarShowingDesktopTasks
+        }
     }
 }
