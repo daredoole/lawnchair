@@ -280,7 +280,15 @@ public final class TaskbarOverlayController {
 //               Log.d(TAG, "setBackgroundBlurRadius: setting early wakeup with token "
 //                                                    + mEarlyWakeupInfo);
                 Trace.instantForTrack(TRACE_TAG_APP, TAG, "notifyRendererForGpuLoadUp");
-                dragLayerViewRoot.notifyRendererForGpuLoadUp("setBackgroundBlurRadius");
+                // LC-Note: same missing-hidden-API concern as
+                // TaskbarAllAppsSlideInView#showOnFullyAttachedToWindow -- not every Android 16
+                // build in the field exposes ViewRootImpl#notifyRendererForGpuLoadUp. Pure perf
+                // hint, safe to skip.
+                try {
+                    dragLayerViewRoot.notifyRendererForGpuLoadUp("setBackgroundBlurRadius");
+                } catch (NoSuchMethodError e) {
+                    Log.d(TAG, "notifyRendererForGpuLoadUp unavailable", e);
+                }
                 try {
 //                    transaction.setEarlyWakeupStart(mEarlyWakeupInfo);
                 } catch (NoSuchMethodError e) {

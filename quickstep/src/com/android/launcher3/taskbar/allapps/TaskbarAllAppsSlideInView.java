@@ -123,7 +123,15 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
                 Log.w(TAG, "overlayVRI is null, cannot notifyRendererOfExpensiveFrame()");
             } else {
                 Trace.instantForTrack(TRACE_TAG_APP, TAG, "notifyRendererForGpuLoadUp");
-                overlayVri.notifyRendererForGpuLoadUp("opening taskbar all apps");
+                // LC-Note: ViewRootImpl#notifyRendererForGpuLoadUp is a hidden API not present
+                // on every Android 16 framework build in the field; calling it there throws
+                // NoSuchMethodError at the call site (not resolvable via reflection fallback,
+                // since the method is entirely absent). This is a pure perf hint, so skip it.
+                try {
+                    overlayVri.notifyRendererForGpuLoadUp("opening taskbar all apps");
+                } catch (NoSuchMethodError e) {
+                    Log.d(TAG, "notifyRendererForGpuLoadUp unavailable", e);
+                }
                 overlayVri.notifyRendererOfExpensiveFrame();
             }
         }

@@ -1688,7 +1688,7 @@ public abstract class AbsSwipeUpHandler<
                     && runningTaskTarget.leash != null
                     && runningTaskTarget.leash.isValid();
             final boolean swipeUpInDesktopWindowing =
-                    DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP.isTrue()
+                    isDesktopWindowingPipEnabled()
                             && runningTaskTarget != null
                             && runningTaskTarget.taskInfo.getWindowingMode()
                             == WINDOWING_MODE_FREEFORM;
@@ -1881,6 +1881,18 @@ public abstract class AbsSwipeUpHandler<
             }
         } catch (NoSuchFieldError ignored) {
             return orientationState.getDisplayRotation();
+        }
+    }
+
+    private static boolean isDesktopWindowingPipEnabled() {
+        // LC-Note: same NoSuchFieldError-safe pattern as
+        // TaskbarActivityContext#isFlagTrueSafe -- DesktopExperienceFlags fields referenced
+        // here are absent from some devices' framework.jar (platform flag set drift vs. the
+        // AOSP source this was compiled against). Treat a missing flag as "not enabled".
+        try {
+            return DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP.isTrue();
+        } catch (NoSuchFieldError ignored) {
+            return false;
         }
     }
 
