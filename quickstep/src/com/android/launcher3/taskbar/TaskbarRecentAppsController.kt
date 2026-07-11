@@ -73,8 +73,8 @@ class TaskbarRecentAppsController(
             false
         }
 
-    // LC-Note: TODO(b/343532825) asked for a setting to disable Recents even when the flag is on
-    // -- added below via PreferenceManager2. Both this and the max-count are read once at
+    // LC-Note: TODO(b/343532825) asked for a setting to disable Recents even when the flag is on --
+    // added below via PreferenceManager2. Both this and the max-count are read once at
     // construction; taskbar-recreation (triggered by the preferences' onSet) is what applies a
     // change, matching how every other taskbar-affecting preference in this codebase works.
     var canShowRecentApps =
@@ -106,7 +106,10 @@ class TaskbarRecentAppsController(
         private set
 
     val shownTaskIds: List<Int>
-        get() = shownTasks.flatMap { shownTask -> shownTask.tasks }.map { it.key.id }
+        get() = taskIdsOf(shownTasks)
+
+    private fun taskIdsOf(tasks: List<GroupTask>): List<Int> =
+        tasks.flatMap { it.tasks }.map { it.key.id }
 
     /**
      * The task-state of an app, i.e. whether the app has a task and what state that task is in.
@@ -323,7 +326,7 @@ class TaskbarRecentAppsController(
      * @return Whether [shownTasks] changed.
      */
     private fun onRecentsOrHotseatChanged(): Boolean {
-        val oldShownTasks = shownTasks
+        val oldTaskIds = taskIdsOf(shownTasks)
         orderedRunningTaskIds = updateOrderedRunningTaskIds()
         shownTasks =
             if (controllers.taskbarDesktopModeController.shouldShowDesktopTasksInTaskbar()) {
@@ -331,7 +334,15 @@ class TaskbarRecentAppsController(
             } else {
                 computeShownRecentTasks()
             }
-        val shownTasksChanged = oldShownTasks != shownTasks
+        // LC-Note: Task/GroupTask/SingleTask don't override equals(), so comparing the lists directly
+        // is reference equality per element. The recents model hands back fresh wrapper objects
+        // on every refresh even when the underlying tasks haven't changed, which made this
+        // "changed" check spuriously true almost every time recents-in-taskbar was live -- and
+        // that drove a full taskbar view rebuild (removeView/addView) on effectively every
+        // task-focus change, causing visible lag and occasionally cancelling an in-progress
+        // long-press mid-gesture. Compare by task ID instead, which is what actually identifies
+        // a task.
+        val shownTasksChanged = oldTaskIds != taskIdsOf(shownTasks)
         if (!shownTasksChanged) {
             return shownTasksChanged
         }
