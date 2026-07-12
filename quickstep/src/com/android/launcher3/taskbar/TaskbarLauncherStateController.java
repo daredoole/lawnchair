@@ -638,6 +638,27 @@ public class TaskbarLauncherStateController {
         float taskbarBgOffsetEnd = showTaskbar ? 0f : 1f;
         float taskbarBgOffsetStart = showTaskbar ? 1f : 0f;
 
+        // LC-Note: Hotseat's ALPHA_CHANNEL_TASKBAR_ALIGNMENT channel defaults to visible
+        // (MultiValueAlpha starts at 1f) and is otherwise only ever hidden from inside
+        // setupPinnedTaskbarAnimation() below, which only runs when the
+        // mTaskbarBackgroundAlpha/taskbarBgOffset change-detection guard trips. On the very
+        // first onStateChangeApplied() after init() (e.g. resuming Home right after a
+        // default-launcher/Home-role switch, or first boot on an unconfigured profile), the
+        // freshly-constructed AnimatedFloats can coincidentally already equal their target
+        // values, so the guard never trips and the Hotseat-hiding call is skipped entirely --
+        // leaving the classic Hotseat row visibly stacked on top of the pinned Taskbar. Set it
+        // directly here, unconditionally, whenever the taskbar is pinned, so Hotseat visibility
+        // can't depend on that animation-only optimization.
+        if (isPinnedTaskbar) {
+            float hotseatIconsTargetAlpha = showTaskbar ? 0 : 1;
+            mLauncher.getHotseat().setIconsAlpha(hotseatIconsTargetAlpha,
+                    ALPHA_CHANNEL_TASKBAR_ALIGNMENT);
+            if (mIsQsbInline) {
+                mLauncher.getHotseat().setQsbAlpha(hotseatIconsTargetAlpha,
+                        ALPHA_CHANNEL_TASKBAR_ALIGNMENT);
+            }
+        }
+
         // Don't animate if background has reached desired value.
         if (mTaskbarBackgroundAlpha.isAnimating()
                 || mTaskbarBackgroundAlpha.value != backgroundAlpha
