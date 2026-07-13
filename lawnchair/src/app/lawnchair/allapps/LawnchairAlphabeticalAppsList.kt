@@ -6,9 +6,10 @@ import androidx.activity.ComponentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import app.lawnchair.LawnchairLauncher
 import app.lawnchair.data.folder.model.FolderOrderUtils
 import app.lawnchair.data.folder.model.FolderViewModel
-import app.lawnchair.launcher
+import app.lawnchair.launcherNullable
 import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.util.categorizeAppsWithSystemAndGoogle
@@ -41,8 +42,18 @@ class LawnchairAlphabeticalAppsList<T>(
     private val prefs2 = PreferenceManager2.getInstance(context)
     private val prefs = PreferenceManager.getInstance(context)
 
+    // LC-Note: `context` here is often a TaskbarActivityContext (taskbar All Apps sheet), which
+    // is a WindowContext, not a real Activity -- it's neither a LawnchairLauncher nor a
+    // LifecycleOwner, so BaseActivity.fromContext(context) (the plain `context.launcher`) throws
+    // IllegalArgumentException and crash-loops every taskbar All Apps open. Fall back to the
+    // app-wide Home activity singleton (alive in-process whenever the taskbar itself can be
+    // shown) instead of requiring the immediate context to be that Activity.
+    private val launcherOrNull: LawnchairLauncher? = context.launcherNullable ?: LawnchairLauncher.instance
+
     private val viewModel = FolderViewModel(
-        (context as? ComponentActivity)?.application ?: context.launcher.application,
+        (context as? ComponentActivity)?.application
+            ?: launcherOrNull?.application
+            ?: context.applicationContext as android.app.Application,
     )
     private var folderList = mutableListOf<FolderInfo>()
     private val filteredList = mutableListOf<AppInfo>()
@@ -50,25 +61,28 @@ class LawnchairAlphabeticalAppsList<T>(
     private val folderOrder = FolderOrderUtils.stringToIntList(prefs.drawerListOrder.get())
 
     init {
-        context.launcher.deviceProfile.inv.addOnChangeListener(this)
+        launcherOrNull?.deviceProfile?.inv?.addOnChangeListener(this)
         (context as? LifecycleOwner)?.lifecycle?.addObserver(this)
-        try {
-            prefs2.hiddenApps.onEach(launchIn = context.launcher.lifecycleScope) {
-                hiddenApps = it
-                onAppsUpdated()
+        launcherOrNull?.let { lch ->
+            try {
+                prefs2.hiddenApps.onEach(launchIn = lch.lifecycleScope) {
+                    hiddenApps = it
+                    onAppsUpdated()
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "Failed to initialize hidden apps", t)
             }
-        } catch (t: Throwable) {
-            Log.w(TAG, "Failed to initialize hidden apps", t)
         }
         observeFolders()
     }
 
     override fun onDestroy(owner: LifecycleOwner) {
-        context.launcher.deviceProfile.inv.removeOnChangeListener(this)
+        launcherOrNull?.deviceProfile?.inv?.removeOnChangeListener(this)
     }
 
     private fun observeFolders() {
-        viewModel.folders.observeOnce(context as LifecycleOwner) { folders ->
+        val owner = (context as? LifecycleOwner) ?: launcherOrNull ?: return
+        viewModel.folders.observeOnce(owner) { folders ->
             folderList = folders
                 .sortedBy { folderOrder.indexOf(it.id) }
                 .toMutableList()

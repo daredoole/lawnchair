@@ -29,7 +29,8 @@ import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import androidx.lifecycle.lifecycleScope
-import app.lawnchair.launcher
+import app.lawnchair.LawnchairLauncher
+import app.lawnchair.launcherNullable
 import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.asState
@@ -61,6 +62,7 @@ import com.android.launcher3.allapps.SearchUiManager
 import com.android.launcher3.allapps.search.AllAppsSearchBarController
 import com.android.launcher3.search.SearchCallback
 import com.android.launcher3.util.Themes
+import com.android.launcher3.views.ActivityContext
 import com.android.systemui.shared.system.BlurUtils
 import java.util.Locale
 import kotlin.math.max
@@ -82,7 +84,15 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     private val qsbMarginTopAdjusting = resources.getDimensionPixelSize(R.dimen.qsb_margin_top_adjusting)
     private val allAppsSearchVerticalOffset = resources.getDimensionPixelSize(R.dimen.all_apps_search_vertical_offset)
 
-    private val launcher = context.launcher
+    // LC-Note: this view is shared between Home's All Apps drawer and the taskbar's All Apps
+    // sheet. The taskbar context is a WindowContext, not a LawnchairLauncher Activity, so plain
+    // `context.launcher` throws IllegalArgumentException there and crashes every taskbar
+    // search-button tap. `launcherOrNull` falls back to the app-wide Home activity singleton for
+    // the Lawnchair-specific (Home-only) behaviors below; `activityContext` uses the generic
+    // AOSP lookup (same pattern as TaskbarPopupController/NudgeController) for anything that only
+    // needs a DeviceProfile, which works in both Home and taskbar contexts.
+    private val launcherOrNull = context.launcherNullable ?: LawnchairLauncher.instance
+    private val activityContext: ActivityContext = ActivityContext.lookupContext(context)
     private val searchBarController = AllAppsSearchBarController()
     private val searchQueryBuilder = SpannableStringBuilder().apply {
         Selection.setSelection(this, 0)
@@ -104,9 +114,9 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     }
     private var bgVisible = true
     private var bgAlpha = 1f
-    private val suggestionsRecent = SearchRecentSuggestions(launcher, LawnchairRecentSuggestionProvider.AUTHORITY, LawnchairRecentSuggestionProvider.MODE)
-    private val prefs = PreferenceManager.getInstance(launcher)
-    private val prefs2 = PreferenceManager2.getInstance(launcher)
+    private val suggestionsRecent = SearchRecentSuggestions(context, LawnchairRecentSuggestionProvider.AUTHORITY, LawnchairRecentSuggestionProvider.MODE)
+    private val prefs = PreferenceManager.getInstance(context)
+    private val prefs2 = PreferenceManager2.getInstance(context)
 
     private var initialPaddingLeft: Int = 0
     private var initialPaddingRight: Int = 0
@@ -175,9 +185,10 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                     },
                     onStartIconClick = if (shouldShowIcons) {
                         {
-                            val launcher = context.launcher
-                            launcher.lifecycleScope.launch {
-                                searchProvider.launch(launcher)
+                            launcherOrNull?.let { lch ->
+                                lch.lifecycleScope.launch {
+                                    searchProvider.launch(lch)
+                                }
                             }
                         }
                     } else {
@@ -264,7 +275,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                 if (input.text.toString() == "/lawnchairdebug") {
                     val enableDebugMenu = prefs.enableDebugMenu
                     enableDebugMenu.set(!enableDebugMenu.get())
-                    launcher.stateManager.goToState(LauncherState.NORMAL)
+                    launcherOrNull?.stateManager?.goToState(LauncherState.NORMAL)
                 }
 
                 queryEmpty = it.isNullOrEmpty()
@@ -279,7 +290,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     }
 
     private fun setupPadding() {
-        launcher.deviceProfile.let { dp ->
+        activityContext.deviceProfile.let { dp ->
             val padding = dp.getAllAppsIconStartMargin(context)
             initialPaddingLeft = padding
             initialPaddingRight = padding
@@ -358,7 +369,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        launcher.deviceProfile.inv.addOnChangeListener(this)
+        activityContext.deviceProfile.inv.addOnChangeListener(this)
         if (::appsView.isInitialized) {
             appsView.appsStore?.addUpdateListener(this)
         }
@@ -367,7 +378,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        launcher.deviceProfile.inv.removeOnChangeListener(this)
+        activityContext.deviceProfile.inv.removeOnChangeListener(this)
         if (::appsView.isInitialized) {
             appsView.appsStore?.removeUpdateListener(this)
         }
@@ -386,7 +397,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
         searchBarController.initialize(
             algorithm,
             input,
-            launcher,
+            activityContext,
             this,
         )
         input.initialize(appsView)
