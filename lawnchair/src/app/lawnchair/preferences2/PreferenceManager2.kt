@@ -703,6 +703,12 @@ class PreferenceManager2 @Inject constructor(
         onSet = { reloadHelper.reloadTaskbar() },
     )
 
+    val hideTaskbarOnHome = preference(
+        key = booleanPreferencesKey("hide_taskbar_on_home"),
+        defaultValue = false,
+        onSet = { reloadHelper.reloadTaskbar() },
+    )
+
     val enableTaskbarOnPhone = preference(
         key = booleanPreferencesKey("enable_taskbar_on_phone"),
         defaultValue = false,

@@ -864,6 +864,8 @@
     <string name="enable_taskbar_recents">Show recent apps in taskbar</string>
     <string name="enable_taskbar_recents_description">Show your most recently used apps in the taskbar, next to your pinned apps.</string>
     <string name="taskbar_recents_max_count">Recent apps shown</string>
+    <string name="hide_taskbar_on_home">Hide Taskbar on Home screen</string>
+    <string name="hide_taskbar_on_home_description">Keep the classic Hotseat on your Home screen instead of the Taskbar, even when the Taskbar is set to always show elsewhere.</string>
 
     <!--
 

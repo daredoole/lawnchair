@@ -154,6 +154,13 @@ fun QuickstepPreferences(
                         valueRange = 1..6,
                     )
                 }
+                Item {
+                    SwitchPreference(
+                        adapter = prefs2.hideTaskbarOnHome.getAdapter(),
+                        label = stringResource(id = R.string.hide_taskbar_on_home),
+                        description = stringResource(id = R.string.hide_taskbar_on_home_description),
+                    )
+                }
             }
         }
     }

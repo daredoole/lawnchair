@@ -17,9 +17,12 @@ package com.android.launcher3.taskbar
 
 import android.animation.AnimatorSet
 import android.annotation.SuppressLint
+import android.content.Context
 import android.view.View
 import androidx.annotation.VisibleForTesting
 import androidx.core.animation.doOnEnd
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import com.android.app.animation.Interpolators
 import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherPrefs.Companion.TASKBAR_PINNING
@@ -181,5 +184,11 @@ class TaskbarPinningController(private val context: TaskbarActivityContext) :
         const val PINNING_PERSISTENT = 1f
         const val PINNING_TRANSIENT = 0f
         const val PINNING_ANIMATION_DURATION = 600L
+
+        // LC-Note: Java-callable bridge for TaskbarLauncherStateController#shouldShowTaskbar,
+        // which needs to read this Lawnchair-side preference from an AOSP-derived Java file.
+        @JvmStatic
+        fun hideOnHome(context: Context): Boolean =
+            PreferenceManager2.getInstance(context).hideTaskbarOnHome.firstCached()
     }
 }

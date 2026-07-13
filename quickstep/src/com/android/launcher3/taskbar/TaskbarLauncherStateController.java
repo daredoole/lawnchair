@@ -794,6 +794,13 @@ public class TaskbarLauncherStateController {
 
     private static boolean shouldShowTaskbar(TaskbarActivityContext activityContext,
             boolean isInLauncher, boolean isInOverview) {
+        // LC-Note: user-facing override (Settings > Recents > Taskbar > "Hide Taskbar on Home
+        // screen") for users who want the classic Hotseat on Home regardless of desktop-mode or
+        // taskbar-pinning state. Checked first so it wins over the desktop-mode force-show cases
+        // below.
+        if (isInLauncher && !isInOverview && TaskbarPinningController.hideOnHome(activityContext)) {
+            return false;
+        }
         if (activityContext.showDesktopTaskbarForFreeformDisplay()) {
             return true;
         }
